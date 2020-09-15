@@ -98,3 +98,11 @@ Seed 0 result (the paper is 5 seeds):
 | 0.511111111 | 1            | 0.424836601 | 0.715447154  | 0.717647059 | 0.455696203 | 0.733333333 | 0.193877551  | 0.604674797 |
 
 Note: with 5 seeds the scores will be closer to that in the paper.
+
+##### Visualizing the localization
+
+```
+python generate_heatmap.py
+```
+
+Generated heapmaps will be in `figs/picked` and `figs/all`. 
