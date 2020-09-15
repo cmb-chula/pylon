@@ -2,6 +2,12 @@
 
 From the paper, Redesigning weakly supervised localization architectures for medical images.
 
+**High accuracy localization:**
+![high accuracy localization](figs/example4_paper.jpg)
+
+**PYLON's architecture:**
+![PYLON architecture](figs/figure_pylonv2.png)
+
 ## What's included
 
 - Pytorch implementaiton of PYLON
@@ -10,14 +16,14 @@ From the paper, Redesigning weakly supervised localization architectures for med
 
 ## Additional results
 
-1. Picked localization images (~20)
-2. All localization images (~1000)
+1. [Picked localization images](figs/picked) (~20)
+2. [All localization images](figs/all) (~1000)
 
 ## Reproducing results
 
 ### Requirements
 
-Listed in requiremnets.txt
+Listed in requiremnets.txt:
 
 - Pytorch 1.5
 - Torchvision
@@ -29,7 +35,7 @@ You need to download the Chest X-Ray 14 dataset by yourself from https://nihcc.a
 
 Extract all the images into a single big directory `./data/images`, containing 100k images.
 
-### Installing https://github.com/qubvel/segmentation_models.pytorch
+### Installing Segmentation models pytorch
 
 ```
 git clone https://github.com/qubvel/segmentation_models.pytorch
@@ -57,9 +63,11 @@ The following code will run PYLON with mix-precision on Chest X-Ray dataset:
 python train.py
 ```
 
-Stats will be available in `csv/pylon/0.csv` where `0` is the seed number.
+Stats will be available at `csv/pylon/0.csv` where `0` is the seed number. 
 
-Editing `train.py` is straightforward. 
+The checkpoint will be available at `save/pylon/0/best`.
+
+Editing `train.py` to other seeds is straightforward. 
 
 #### Evaluation
 
@@ -71,7 +79,7 @@ This step loads the best model (by validation loss), then runs it against test d
 python eval_auc.py
 ```
 
-A single seed result (the paper is 5 seeds):
+Seed 0 result (the paper is 5 seeds):
 
 | Atelectasis | Cardiomegaly | Effusion    | Infiltration | Mass        | Nodule      | Pneumonia   | Pneumothorax | Consolidation | Edema       | Emphysema   | Fibrosis   | Pleural_Thickening | Hernia      | micro       | macro       |
 |-------------|--------------|-------------|--------------|-------------|-------------|-------------|--------------|---------------|-------------|-------------|------------|--------------------|-------------|-------------|-------------|
@@ -83,7 +91,7 @@ A single seed result (the paper is 5 seeds):
 python eval_loc.py
 ```
 
-A single seed result (the paper is 5 seeds):
+Seed 0 result (the paper is 5 seeds):
 
 | Atelectasis | Cardiomegaly | Effusion    | Infiltration | Mass        | Nodule      | Pneumonia   | Pneumothorax | micro       |
 |-------------|--------------|-------------|--------------|-------------|-------------|-------------|--------------|-------------|
