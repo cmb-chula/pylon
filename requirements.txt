@@ -2,3 +2,5 @@ torch==1.5
 torchvision
 albumentations
 pandas
+matplotlib
+numpy
