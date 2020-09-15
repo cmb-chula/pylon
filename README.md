@@ -79,6 +79,8 @@ This step loads the best model (by validation loss), then runs it against test d
 python eval_auc.py
 ```
 
+5 seeds result (not the same as in the paper):
+
 | Atelectasis | Cardiomegaly | Effusion | Infiltration | Mass     | Nodule   | Pneumonia | Pneumothorax | Consolidation | Edema    | Emphysema | Fibrosis | Pleural_Thickening | Hernia   | micro    | macro    |
 |-------------|--------------|----------|--------------|----------|----------|-----------|--------------|---------------|----------|-----------|----------|--------------------|----------|----------|----------|
 | 0.780088    | 0.893228     | 0.835086 | 0.699809     | 0.833723 | 0.771837 | 0.732016  | 0.867914     | 0.752056      | 0.847234 | 0.921745  | 0.828212 | 0.785553           | 0.907488 | 0.793997 | 0.818285 |
@@ -95,7 +97,7 @@ Note: some deviations are expected.
 python eval_loc.py
 ```
 
-Seed 0 result (the paper is 5 seeds):
+5 seeds result (not the same as in the paper):
 
 | Atelectasis | Cardiomegaly | Effusion    | Infiltration | Mass        | Nodule      | Pneumonia   | Pneumothorax | micro       |
 |-------------|--------------|-------------|--------------|-------------|-------------|-------------|--------------|-------------|
