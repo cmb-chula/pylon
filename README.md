@@ -23,7 +23,7 @@ From the paper, Redesigning weakly supervised localization architectures for med
 
 ### Requirements
 
-Listed in requiremnets.txt:
+Listed in requirements.txt:
 
 - Pytorch 1.4, 1.5 or 1.6
 - Torchvision
