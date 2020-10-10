@@ -47,14 +47,11 @@ class PylonCore(SegmentationModel):
             self,
             encoder_name: str = "resnet50",
             encoder_weights: str = "imagenet",
-            encoder_dilation: bool = False,
             decoder_channels: int = 128,
             in_channels: int = 1,
             classes: int = 1,
             upsampling: int = 1,
             align_corners=True,
-            aux_params=None,
-            activation=None,
     ):
         super(PylonCore, self).__init__()
 
@@ -65,9 +62,6 @@ class PylonCore(SegmentationModel):
             weights=encoder_weights,
         )
 
-        if encoder_dilation:
-            self.encoder.make_dilated(stage_list=[5], dilation_list=[2])
-
         self.decoder = PylonDecoder(
             encoder_channels=self.encoder.out_channels,
             decoder_channels=decoder_channels,
@@ -77,15 +71,12 @@ class PylonCore(SegmentationModel):
 
         self.segmentation_head = SegmentationHead(in_channels=decoder_channels,
                                                   out_channels=classes,
-                                                  activation=activation,
+                                                  activation=None,
                                                   kernel_size=1,
                                                   upsampling=upsampling)
 
-        if aux_params is not None:
-            self.classification_head = ClassificationHead(
-                in_channels=self.encoder.out_channels[-1], **aux_params)
-        else:
-            self.classification_head = None
+        # just to comply with SegmentationModel
+        self.classification_head = None
 
         self.name = "pylon-{}".format(encoder_name)
         self.initialize()
