@@ -10,9 +10,9 @@ From the paper, Redesigning weakly supervised localization architectures for med
 
 ## What's included
 
-- Pytorch implementaiton of PYLON
+- Pytorch implementation of PYLON
 - Additional results
-- Reproducing the main results
+- Code to reproduce the main results
 
 ## Additional results
 
@@ -25,7 +25,7 @@ From the paper, Redesigning weakly supervised localization architectures for med
 
 Listed in requiremnets.txt:
 
-- Pytorch 1.5
+- Pytorch 1.4, 1.5 or 1.6
 - Torchvision
 - albumentations
 - Segmentation models pytorch (a3cc9ac) 
