@@ -18,6 +18,7 @@ From the paper, Redesigning weakly supervised localization architectures for med
 
 1. [Picked localization images](figs/picked) (~20)
 
+    * [PYLON](figs/picked)
     * [Backbone](figs/picked-backbone)
     * [DeeplabV3+](figs/picked-deeplabv3+)
     * [DeeplabV3+ (No GAP)](figs/picked-deeplabv3+,nogap)
