@@ -17,6 +17,16 @@ From the paper, Redesigning weakly supervised localization architectures for med
 ## Additional results
 
 1. [Picked localization images](figs/picked) (~20)
+
+    * [Backbone](figs/picked-backbone)
+    * [DeeplabV3+](figs/picked-deeplabv3+)
+    * [DeeplabV3+ (No GAP)](figs/picked-deeplabv3+,nogap)
+    * [FPN](figs/picked-fpn)
+    * [FPN (BN)](figs/picked-fpn,bn)
+    * [Li 2018](figs/picked-li2018)
+    * [PAN](figs/picked-pan)
+    * [UNET](figs/picked-unet)
+
 2. [All localization images](figs/all) (~1000)
 
 ## Reproducing results
