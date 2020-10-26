@@ -11,6 +11,7 @@ From the paper, "High resolution weakly supervised localization architectures fo
 ## What's included
 
 - Pytorch implementation of PYLON
+    * [Pretrained weights](https://drive.google.com/file/d/1mXM_eB_FD8tRauKUt5nD3QBsrhqPEbzQ/view?usp=sharing): usage download the file into a directory, say `save/pretrained/model.pkl`, in the `generate_heatmap.py`, use the following checkpoint path: `save/pretrained`.
 - Additional results
 - Code to reproduce the main results
 
