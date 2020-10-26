@@ -66,7 +66,7 @@ def corners(rect, base_size=256, tgt_size=1024):
     x, y, w, h = rect
     corners = np.array([[x, y], [x + w, y], [x + w, y + h], [x, y + h], [x,
                                                                          y]])
-    corners = corners * 1024 / 256
+    corners = corners * tgt_size / base_size
     return corners
 
 
