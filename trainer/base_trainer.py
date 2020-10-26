@@ -128,7 +128,9 @@ class BaseTrainer(LooperInterface):
                 print('warning: cannot load the optimizer state!')
             else:
                 self.opt.load_state_dict(state['opt'])
-        self.state.update(state['state'])
+        # if able to load the trainer state
+        if 'state' in state:
+            self.state.update(state['state'])
 
     def save(self, dirname: str):
         """save the trainer into trainer.pkl and model.pkl,
@@ -142,19 +144,20 @@ class BaseTrainer(LooperInterface):
         torch_save(notnet, f'{dirname}/trainer.pkl')
 
     def load(self, dirname: str):
-        if dirname[-4:] == '.pkl':
-            # this is old version, loads the whole state
-            data = torch.load(dirname, map_location=self.device)
-            self.load_state(data)
+        net_state = torch.load(f'{dirname}/model.pkl',
+                               map_location=self.device)
+        if os.path.exists(f'{dirname}/trainer.pkl'):
+            other_state = torch.load(f'{dirname}/trainer.pkl',
+                                     map_location=self.device)
         else:
-            # new version, load from two files
-            state = {
-                'net': torch.load(f'{dirname}/model.pkl',
-                                  map_location=self.device),
-                **torch.load(f'{dirname}/trainer.pkl',
-                             map_location=self.device),
-            }
-            self.load_state(state)
+            print('trainer state does not exist, only load the model.')
+            other_state = {}
+
+        state = {
+            'net': net_state,
+            **other_state,
+        }
+        self.load_state(state)
 
     @classmethod
     def convert_save(cls, file: str):
