@@ -1,6 +1,6 @@
 # Official implementation of Pyramid Localization Network (PYLON)
 
-From the paper, "High resolution weakly supervised localization architectures for medical images".
+From the paper, "High resolution weakly supervised localization architectures for medical images". [(Preprint)](https://arxiv.org/abs/2010.11475)
 
 **High accuracy localization:**
 ![high accuracy localization](figs/example4_paper.jpg)
