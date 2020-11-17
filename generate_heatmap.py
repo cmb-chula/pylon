@@ -97,6 +97,7 @@ def generate(checkpoint,
              images_path='data/images',
              size=256,
              interpolation='cubic',
+             plot_size=7,
              dev='cuda:0'):
     eval_transform = make_transform('eval',
                                     size=size,
@@ -145,7 +146,8 @@ def generate(checkpoint,
         for page in range(n_pages):
             fig, ax = plt.subplots(nrows=page_size,
                                    ncols=2,
-                                   figsize=(10, 5 * page_size))
+                                   figsize=(plot_size * 2,
+                                            plot_size * page_size))
             for i in range(page_size):
                 yield ax[i]
             if picked:
