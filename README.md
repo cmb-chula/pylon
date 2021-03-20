@@ -19,21 +19,21 @@ From the paper, "High resolution weakly supervised localization architectures fo
 
 1. [Picked localization images (256 x 256)](figs/picked/bs64_nih14_256min0.7-rot90p0.5-bc(0.5,0.5)-cubic) (~20)
 
-    * [PYLON](figs/picked/bs64_nih14_256min0.7-rot90p0.5-bc(0.5,0.5)-cubic/pylon-resnet50-uptype2layer-imagenet-dec128_lr0.0001term1e-06rop1fac0.2_fp16)
-    * [Backbone](figs/picked/bs64_nih14_256min0.7-rot90p0.5-bc(0.5,0.5)-cubic/baseline-resnet50-maxpool-imagenet_lr0.0001term1e-06rop1fac0.2_fp16)
-    * [DeeplabV3+](figs/picked/bs64_nih14_256min0.7-rot90p0.5-bc(0.5,0.5)-cubic/deeplabv3+-resnet50-dec256-imagenet_lr0.0001term1e-06rop1fac0.2_fp16)
-    * [DeeplabV3+ (No GAP)](figs/picked/bs64_nih14_256min0.7-rot90p0.5-bc(0.5,0.5)-cubic/deeplabv3+-resnet50-dec256-nogap-imagenet_lr0.0001term1e-06rop1fac0.2_fp16)
-    * [FPN (BN)](figs/picked/bs64_nih14_256min0.7-rot90p0.5-bc(0.5,0.5)-cubic/fpn-resnet50-py256dec128-bn-imagenet_lr0.0001term1e-06rop1fac0.2_fp16)
-    * [Li 2018](figs/picked/bs64_nih14_256min0.7-rot90p0.5-bc(0.5,0.5)-cubic/li2018-resnet50-dec512out20-mil0.98-imagenet_lr0.0001term1e-06rop1fac0.2_fp16)
-    * [PAN](figs/picked/bs64_nih14_256min0.7-rot90p0.5-bc(0.5,0.5)-cubic/pan-resnet50-dec128-imagenet_lr0.0001term1e-06rop1fac0.2_fp16)
-    * [UNET](figs/picked/bs64_nih14_256min0.7-rot90p0.5-bc(0.5,0.5)-cubic/unet-resnet50-(256,128,64,64,64)-imagenet_lr0.0001term1e-06rop1fac0.2_fp16)
+    * [PYLON](figs/picked/bs64_nih14_256min0.7-rot90p0.5-bc(0.5%2C0.5)-cubic/pylon-resnet50-uptype2layer-imagenet-dec128_lr0.0001term1e-06rop1fac0.2_fp16/0)
+    * [Backbone](figs/picked/bs64_nih14_256min0.7-rot90p0.5-bc(0.5%2C0.5)-cubic/baseline-resnet50-maxpool-imagenet_lr0.0001term1e-06rop1fac0.2_fp16/0)
+    * [DeeplabV3+](figs/picked/bs64_nih14_256min0.7-rot90p0.5-bc(0.5%2C0.5)-cubic/deeplabv3+-resnet50-dec256-imagenet_lr0.0001term1e-06rop1fac0.2_fp16/0)
+    * [DeeplabV3+ (No GAP)](figs/picked/bs64_nih14_256min0.7-rot90p0.5-bc(0.5%2C0.5)-cubic/deeplabv3+-resnet50-dec256-nogap-imagenet_lr0.0001term1e-06rop1fac0.2_fp16/0)
+    * [FPN (BN)](figs/picked/bs64_nih14_256min0.7-rot90p0.5-bc(0.5%2C0.5)-cubic/fpn-resnet50-py256dec128-bn-imagenet_lr0.0001term1e-06rop1fac0.2_fp16/0)
+    * [Li 2018](figs/picked/bs64_nih14_256min0.7-rot90p0.5-bc(0.5%2C0.5)-cubic/li2018-resnet50-dec512out20-mil0.98-imagenet_lr0.0001term1e-06rop1fac0.2_fp16/0)
+    * [PAN](figs/picked/bs64_nih14_256min0.7-rot90p0.5-bc(0.5%2C0.5)-cubic/pan-resnet50-dec128-imagenet_lr0.0001term1e-06rop1fac0.2_fp16/0)
+    * [UNET](figs/picked/bs64_nih14_256min0.7-rot90p0.5-bc(0.5%2C0.5)-cubic/unet-resnet50-(256%2C128%2C64%2C64%2C64)-imagenet_lr0.0001term1e-06rop1fac0.2_fp16/0)
 
 2. [Picked localization images (512 x 512)](figs/picked/bs64_nih14_512min0.7-rot90p0.5-bc(0.5,0.5)-cubic) (~20)
 
-    * [PYLON](figs/picked/bs64_nih14_512min0.7-rot90p0.5-bc(0.5,0.5)-cubic/pylon-resnet50-uptype2layer-imagenet-dec128_lr0.0001term1e-06rop1fac0.2_fp16)
-    * [Backbone](figs/picked/bs64_nih14_512min0.7-rot90p0.5-bc(0.5,0.5)-cubic/baseline-resnet50-maxpool-imagenet_lr0.0001term1e-06rop1fac0.2_fp16)
-    * [FPN (BN)](figs/picked/bs64_nih14_512min0.7-rot90p0.5-bc(0.5,0.5)-cubic/fpn-resnet50-py256dec128-bn-imagenet_lr0.0001term1e-06rop1fac0.2_fp16)
-    * [Li 2018](figs/picked/bs64_nih14_512min0.7-rot90p0.5-bc(0.5,0.5)-cubic/li2018-resnet50-dec512out20-mil0.98-imagenet_lr0.0001term1e-06rop1fac0.2_fp16)
+    * [PYLON](figs/picked/bs64_nih14_512min0.7-rot90p0.5-bc(0.5%2C0.5)-cubic/pylon-resnet50-upv3-imagenet-dec128_lr0.0001term1e-06rop1fac0.2_fp16/0)
+    * [Backbone](figs/picked/bs64_nih14_512min0.7-rot90p0.5-bc(0.5%2C0.5)-cubic/baseline-resnet50-maxpool-imagenet_lr0.0001term1e-06rop1fac0.2_fp16/0)
+    * [FPN (BN)](figs/picked/bs64_nih14_512min0.7-rot90p0.5-bc(0.5%2C0.5)-cubic/fpn-resnet50-py256dec128-bn-imagenet_lr0.0001term1e-06rop1fac0.2_fp16/0)
+    * [Li 2018](figs/picked/bs64_nih14_512min0.7-rot90p0.5-bc(0.5%2C0.5)-cubic/li2018-resnet50-dec512out20-mil0.98-imagenet_lr0.0001term1e-06rop1fac0.2_fp16/0)
 
 3. [All localization images (256 x 256)](figs/all/bs64_nih14_256min0.7-rot90p0.5-bc(0.5,0.5)-cubic/pylon-resnet50-uptype2layer-imagenet-dec128_lr0.0001term1e-06rop1fac0.2_fp16) (~1000 images)
 
