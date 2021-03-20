@@ -1,6 +1,7 @@
-torch==1.5
-torchvision
 albumentations
 pandas
+opencv-python
 matplotlib
 numpy
+git+https://github.com/qubvel/segmentation_models.pytorch@v0.1.3
+git+https://github.com/phizaz/pytorch-trainer@pylon2

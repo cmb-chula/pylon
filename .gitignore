@@ -6,3 +6,6 @@ eval_auc
 __pycache__
 data/images
 .vscode
+pretrain
+data/nih14/images
+data/vin/images

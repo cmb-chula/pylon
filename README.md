@@ -37,15 +37,28 @@ From the paper, "High resolution weakly supervised localization architectures fo
 
 Listed in requirements.txt:
 
-- Pytorch 1.4, 1.5 or 1.6
+- Pytorch 1.7
 - Torchvision
 - albumentations
-- Segmentation models pytorch (a3cc9ac) 
-- Nvidia's Apex (5d9b5cb)
+- Segmentation models pytorch
 
+
+
+### Preparing datasets
+
+
+#### NIH's Chest X-Ray 14
 You need to download the Chest X-Ray 14 dataset by yourself from https://nihcc.app.box.com/v/ChestXray-NIHCC.
 
-Extract all the images into a single big directory `./data/images`, containing 100k images.
+Extract all the images into a single big directory `data/nih14/images`, containing 100k images.
+
+#### VinDr-CXR
+
+Download the DICOM version from Kaggle https://www.kaggle.com/c/vinbigdata-chest-xray-abnormalities-detection/overview
+
+You need to convert them into PNG. The script is provided in `scripts/convert_dcm_to_png.py`. The conversion will not alter the aspect ratio it will aim for maximum 1024 either width or height.
+
+Put all the PNG files into directory `data/vin/images`.
 
 ### Installing Segmentation models pytorch
 
