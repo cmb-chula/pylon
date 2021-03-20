@@ -6,13 +6,13 @@ From the paper, "High resolution weakly supervised localization architectures fo
 ![high accuracy localization](figs/example4_paper.jpg)
 
 **PYLON's architecture:**
-![PYLON architecture](figs/figure_pylonv2.png)
+![PYLON architecture](figs/figure_pylon_crop.png)
 
 ## What's included
 
 - Pytorch implementation of PYLON
-    * [Pretrained weights](https://drive.google.com/file/d/1mXM_eB_FD8tRauKUt5nD3QBsrhqPEbzQ/view?usp=sharing): download the file into a directory, say `save/pretrained/model.pkl`. In `generate_heatmap.py`, use the following checkpoint path: `save/pretrained`.
-- Additional results
+    * [Pretrained weights](https://drive.google.com/file/d/1v26dU21hjePidW5crSXsrpf3OCJWLoWp/view?usp=sharing)
+- Additional results and heatmaps 
 - Code to reproduce the main results
 
 ## Additional results
@@ -35,14 +35,13 @@ From the paper, "High resolution weakly supervised localization architectures fo
 
 ### Requirements
 
-Listed in requirements.txt:
+It was tested with Pytorch 1.7.1.
 
-- Pytorch 1.7
-- Torchvision
-- albumentations
-- Segmentation models pytorch
+Install other related libraries:
 
-
+```
+pip install -r requirements.txt
+```
 
 ### Preparing datasets
 
