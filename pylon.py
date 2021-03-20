@@ -13,15 +13,25 @@ from utils.pretrain import *
 class PylonConfig:
     backbone: str = 'resnet50'
     weights: str = 'imagenet'
-    n_dec_ch: int = 128
     n_in: int = 1
     n_out: int = 14
+    # number of decoding feature maps
+    n_dec_ch: int = 128
+    # number of UP modules
     n_up: int = 3
+    # prediction head kernel size
     seg_kern_size: int = 1
+    # whether to use pyramidal attention
     use_pa: bool = True
+    # UP module's conv layers
+    # '1layer' or '2layer' (default)
     up_type: str = '2layer'
+    # UP module's conv kernel size
     up_kernel_size: int = 1
+    # freeze?
+    # 'enc' to freeze the encoder
     freeze: str = None
+    # pretraining configs
     pretrain_conf: PretrainConfig = None
 
     @property
