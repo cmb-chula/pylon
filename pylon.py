@@ -39,8 +39,7 @@ class PylonConfig:
         name = f'pylon-{self.backbone}'
         if not self.use_pa:
             name += '-nopa'
-        if self.up_type != 'v1':
-            name += f'-uptype{self.up_type}'
+        name += f'-uptype{self.up_type}'
         if self.up_kernel_size != 1:
             name += f'-upkern{self.up_kernel_size}'
         if self.n_up != 3:
