@@ -1,4 +1,4 @@
-albumentations
+git+https://github.com/albumentations-team/albumentations@0.5.2
 pandas
 opencv-python
 matplotlib
