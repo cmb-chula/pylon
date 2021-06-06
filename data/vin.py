@@ -64,7 +64,7 @@ SPLITS = {
 }
 
 IMAGES = {
-    '1024ratio': ('train1024-keepratio', 'train1024-keepratio_ratio.csv')
+    '1024ratio': ('images', 'images_ratio.csv')
 }
 
 
