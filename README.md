@@ -105,3 +105,18 @@ python train_voc_run.py
 Stats will be available at `eval_auc` and `eval_loc`. 
 
 The figures will be available at `figs/picked` and `figs/all`.
+
+
+#### Running in parallel
+
+You can change the config in `mlkitenv.json`:
+
+```
+{
+    # available GPUs 
+    "cuda": [0],
+    "num_workers": 8,
+    # number of parallel jobs
+    "global_lock": 1
+}
+```
