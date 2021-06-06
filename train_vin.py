@@ -183,10 +183,10 @@ def vin_pylon_transfer_two_phase(seed,
     # train on NIH
     pre_conf = nih_pylon(seed, size, bs, up_type, **kwargs)[0]
     # train only the decoder
+    data_conf = VinDataConfig(bs=bs, trans_conf=XRayTransformConfig(size=size))
     first_phase_conf = VinConfig(
         seed=seed,
-        data_conf=VinDataConfig(bs=bs,
-                                trans_conf=XRayTransformConfig(size=size)),
+        data_conf=data_conf,
         net_conf=PylonConfig(
             n_in=1,
             n_out=15,
@@ -204,8 +204,7 @@ def vin_pylon_transfer_two_phase(seed,
     out.append(
         VinConfig(
             seed=seed,
-            data_conf=VinDataConfig(bs=bs,
-                                    trans_conf=XRayTransformConfig(size=size)),
+            data_conf=data_conf,
             net_conf=PylonConfig(
                 n_in=1,
                 n_out=15,
