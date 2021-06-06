@@ -1,3 +1,5 @@
+import math
+
 import cv2
 from albumentations import *
 from albumentations.pytorch import ToTensorV2
@@ -11,13 +13,15 @@ SD = (0.2483, )
 
 
 @dataclass
-class TransformConfig(BaseConfig):
+class XRayTransformConfig(BaseConfig):
     size: int = 256
     rotate: int = 90
     p_rotate: float = 0.5
     brightness: float = 0.5
     contrast: float = 0.5
     min_size: float = 0.7
+    ratio_min: float = 3 / 4
+    ratio_max: float = 4 / 3
     interpolation: str = 'cubic'
     bbox_min_visibility: float = 0.5
     mean: Tuple[float] = MEAN
@@ -26,7 +30,11 @@ class TransformConfig(BaseConfig):
     @property
     def name(self):
         a = []
-        a.append(f'{self.size}min{self.min_size}')
+        tmp = f'{self.size}min{self.min_size}'
+        if not (math.isclose(self.ratio_min, 3 / 4)
+                and math.isclose(self.ratio_max, 4 / 3)):
+            tmp += f'rat({self.ratio_min:.2f},{self.ratio_max:.2f})'
+        a.append(tmp)
         if self.p_rotate > 0:
             a.append(f'rot{self.rotate}p{self.p_rotate}')
         a.append(f'bc({self.brightness},{self.contrast})')
@@ -35,53 +43,59 @@ class TransformConfig(BaseConfig):
             a.append(f'bboxmin{self.bbox_min_visibility}')
         return '-'.join(a)
 
+    def make_transform(self, mode: str):
+        """
+        Args:
+            mode: 'train' or 'eval'
+        """
+        inter_opts = {
+            'linear': cv2.INTER_LINEAR,
+            'cubic': cv2.INTER_CUBIC,
+        }
+        inter = inter_opts[self.interpolation]
 
-def make_transform(augment, conf: TransformConfig):
-    inter_opts = {
-        'linear': cv2.INTER_LINEAR,
-        'cubic': cv2.INTER_CUBIC,
-    }
-    inter = inter_opts[conf.interpolation]
-
-    trans = []
-    if augment == 'train':
-        if conf.rotate > 0:
+        trans = []
+        if mode == 'train':
+            if self.rotate > 0:
+                trans += [
+                    Rotate(self.rotate,
+                           border_mode=0,
+                           p=self.p_rotate,
+                           interpolation=inter)
+                ]
+            if self.min_size == 1:
+                trans += [Resize(self.size, self.size, interpolation=inter)]
+            else:
+                trans += [
+                    RandomResizedCrop(self.size,
+                                      self.size,
+                                      scale=(self.min_size, 1.0),
+                                      ratio=(self.ratio_min, self.ratio_max),
+                                      p=1.0,
+                                      interpolation=inter)
+                ]
+            trans += [HorizontalFlip(p=0.5)]
+            if self.contrast > 0 or self.brightness > 0:
+                trans += [
+                    RandomBrightnessContrast(self.brightness,
+                                             self.contrast,
+                                             p=0.5)
+                ]
+            trans += [Normalize(self.mean, self.std)]
+        elif mode == 'eval':
             trans += [
-                Rotate(conf.rotate,
-                       border_mode=0,
-                       p=conf.p_rotate,
-                       interpolation=inter)
+                Resize(self.size, self.size, interpolation=inter),
+                Normalize(self.mean, self.std),
             ]
-        if conf.min_size == 1:
-            trans += [Resize(conf.size, conf.size, interpolation=inter)]
         else:
-            trans += [
-                RandomResizedCrop(conf.size,
-                                  conf.size,
-                                  scale=(conf.min_size, 1.0),
-                                  p=1.0,
-                                  interpolation=inter)
-            ]
-        trans += [HorizontalFlip(p=0.5)]
-        if conf.contrast > 0 or conf.brightness > 0:
-            trans += [
-                RandomBrightnessContrast(conf.brightness, conf.contrast, p=0.5)
-            ]
-        trans += [Normalize(conf.mean, conf.std)]
-    elif augment == 'eval':
-        trans += [
-            Resize(conf.size, conf.size, interpolation=inter),
-            Normalize(conf.mean, conf.std),
-        ]
-    else:
-        raise NotImplementedError()
+            raise NotImplementedError()
 
-    trans += [GrayToTensor()]
-    return Compose(trans,
-                   bbox_params=BboxParams(
-                       format='coco',
-                       min_visibility=conf.bbox_min_visibility,
-                   ))
+        trans += [GrayToTensor()]
+        return Compose(trans,
+                       bbox_params=BboxParams(
+                           format='coco',
+                           min_visibility=self.bbox_min_visibility,
+                       ))
 
 
 class GrayToTensor(ToTensorV2):

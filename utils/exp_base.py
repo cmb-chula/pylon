@@ -5,45 +5,44 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-from data.nih14_data import *
-from data.vin_data import *
-from model.baseline import *
-from model.deeplab import *
-from model.deeplab_custom import *
-from model.fpn import *
-from model.li2018 import *
-from model.pan import *
-from model.pylon_custom import *
-from model.unet import *
-from pylon import *
 from trainer.start import *
 
+from data.nih14 import *
+from data.vin import *
+from data.voc import *
+from model.baseline import *
+from model.fpn import *
+from pylon import *
+from model.unet import *
+from model.li2018 import *
+from model.deeplab import *
+from model.pan import *
+from model.deeplab_custom import *
 from utils.callbacks import *
 from utils.csv import *
 from utils.heatmap import *
 from utils.localization import *
 
-UnionModelConfig = Union[PylonCustomConfig, PylonConfig, BaselineModelConfig,
+UnionModelConfig = Union[PylonConfig, BaselineModelConfig,
                          UnetConfig, FPNConfig, Li2018Config, PANConfig,
                          Deeplabv3Config]
 
-UnionDataConfig = Union[NIH14DataConfig, VinDataConfig]
+UnionDataConfig = Union[NIH14DataConfig, VinDataConfig, VOCDataConfig]
 
 
 @dataclass
 class Config(BaseTrainerConfig):
-    bs: int = 64
-    n_ep: int = 40
+    n_ep: int = None
     device: str = 'cuda:0'
     seed: int = 0
     data_conf: UnionDataConfig = None
-    net_conf: UnionModelConfig = None
+    net_conf: UnionDataConfig = None
     optimizier: str = 'adam'
     lr: Union[float, Tuple[float]] = 1e-4
     lr_term: float = 1e-6
     rop_patience: int = 1
     rop_factor: float = 0.2
-    n_worker: int = 4
+    n_worker: int = ENV.num_workers
     fp16: bool = True
     n_eval_ep_cycle: int = 1
     best_dir: str = 'best'
@@ -56,67 +55,35 @@ class Config(BaseTrainerConfig):
 
     @property
     def name(self):
-        if self.save_dir is not None:
-            return self.save_dir
-        a = f'bs{self.bs}_{self.data_conf.name}'
-        b = f'{self.net_conf.name}'
-        if self.optimizier == 'pylonadam':
-            b += f'_pylonadam_lr({",".join(str(lr) for lr in self.lr)})'
-        else:
-            b += f'_lr{self.lr}'
-        b += f'term{self.lr_term}rop{self.rop_patience}fac{self.rop_factor}'
-        if self.fp16:
-            b += f'_fp16'
-        c = f'{self.seed}'
-        return '/'.join([a, b, c])
+        raise NotImplementedError()
+
+    def make_experiment(self):
+        raise NotImplementedError()
 
 
 class Trainer(BaseTrainer):
-    def __init__(self, conf: Config, callbacks=None):
-        super().__init__(conf, callbacks=callbacks)
+    def __init__(self, conf: Config, data: BaseCombinedDataset):
+        super().__init__(conf)
         self.conf = conf
+        self.data = data
+
+    @property
+    def metrics(self):
+        return ['loss', 'loss_bbox', 'loss_pred']
 
     def forward_pass(self, data, **kwargs):
-        x = data['img']
-        y = data['classification']
-        res = self.net(x)
-        loss = F.binary_cross_entropy_with_logits(res['pred'], y.float())
+        res = self.net(**data)
         return {
             **data,
-            'pred': res['pred'],
-            'pred_seg': res['seg'],
-            'loss': loss,
-            'n': len(x),
+            **res.__dict__,
+            'n': len(data['img']),
         }
 
-    @classmethod
-    def make_default_callbacks(cls):
-        return super().make_default_callbacks() + [
-            MovingAvgCb(['loss']), ReportLRCb()
-        ]
+    def make_default_callbacks(self):
+        return super().make_default_callbacks() + [MovingAvgCb(self.metrics)]
 
     def make_net(self):
-        if isinstance(self.conf.net_conf, PylonCustomConfig):
-            net = PylonCustom(self.conf.net_conf)
-        elif isinstance(self.conf.net_conf, PylonConfig):
-            net = Pylon(self.conf.net_conf)
-        elif isinstance(self.conf.net_conf, BaselineModelConfig):
-            net = BaselineModel(self.conf.net_conf)
-        elif isinstance(self.conf.net_conf, FPNConfig):
-            net = FPN(self.conf.net_conf)
-        elif isinstance(self.conf.net_conf, UnetConfig):
-            net = Unet(self.conf.net_conf)
-        elif isinstance(self.conf.net_conf, Li2018Config):
-            net = Li2018(self.conf.net_conf)
-        elif isinstance(self.conf.net_conf, PANConfig):
-            net = PAN(self.conf.net_conf)
-        elif isinstance(self.conf.net_conf, Deeplabv3Config):
-            net = Deeplabv3(self.conf.net_conf)
-        elif isinstance(self.conf.net_conf, Deeplabv3CustomConfig):
-            net = Deeplabv3Custom(self.conf.net_conf)
-        else:
-            raise NotImplementedError()
-        return net
+        return self.conf.net_conf.make_model()
 
     def make_opt(self, net):
         if self.conf.optimizier == 'pylonadam':
@@ -126,22 +93,15 @@ class Trainer(BaseTrainer):
 
 
 class Experiment:
-    def __init__(self, conf: Config, data_cls, trainer_cls) -> None:
+    def __init__(self, conf: Config, trainer_cls) -> None:
         self.conf = conf
-        self.data_cls = data_cls
         self.make_dataset()
         self.trainer_cls = trainer_cls
         if conf.fp16:
             self.trainer_cls = amp_trainer_mask(self.trainer_cls)
 
     def make_dataset(self):
-        self.dataset = self.data_cls(self.conf.data_conf)
-        self.train_loader = self.make_loader(self.dataset.train_data,
-                                             shuffle=True)
-        self.val_loader = self.make_loader(self.dataset.val_data,
-                                           shuffle=False)
-        self.test_loader = self.make_loader(self.dataset.test_data,
-                                            shuffle=False)
+        raise NotImplementedError()
 
     def train(self):
         if self.conf.pre_conf is not None:
@@ -150,13 +110,16 @@ class Experiment:
             pre_exp = self.__class__(self.conf.pre_conf)
             pre_exp.train()
 
+        print('running:', self.conf.name)
         set_seed(self.conf.seed)
-        callbacks = self.trainer_cls.make_default_callbacks(
-        ) + self.make_callbacks()
-        trainer = self.trainer_cls(self.conf, callbacks)
-        trainer.train(self.train_loader, n_max_ep=self.conf.n_ep)
+        trainer = self.trainer_cls(self.conf, self.data)
+        callbacks = trainer.make_default_callbacks() + self.make_callbacks(
+            trainer)
+        trainer.train(self.train_loader,
+                      n_max_ep=self.conf.n_ep,
+                      callbacks=callbacks)
 
-    def make_callbacks(self):
+    def make_callbacks(self, trainer: Trainer):
         callbacks = []
         callbacks += [
             LRReducePlateauCb('val_loss',
@@ -181,7 +144,7 @@ class Experiment:
         return callbacks
 
     def load_trainer(self):
-        trainer = self.trainer_cls(self.conf)
+        trainer = self.trainer_cls(self.conf, self.data)
         if self.conf.best_dir != 'none':
             trainer.load(
                 f'save/{self.conf.name}/checkpoints/{self.conf.best_dir}')
@@ -192,7 +155,7 @@ class Experiment:
         self.test_loc()
 
     def test_auc(self):
-        cls_id_to_name = self.dataset.test_data.id_to_cls
+        cls_id_to_name = self.data.test.id_to_cls
         callbacks = [
             ProgressCb('test'),
             AvgCb('loss'),
@@ -218,7 +181,7 @@ class Experiment:
         group_seeds(dirname)
 
     def test_loc(self):
-        cls_id_to_name = self.dataset.test_data.id_to_cls
+        cls_id_to_name = self.data.test.id_to_cls
         callbacks = [
             ProgressCb('test'),
             LocalizationAccCb(
@@ -243,10 +206,10 @@ class Experiment:
         group_seeds(dirname)
 
     def generate_picked_heatmap(self):
-        dataset = self.dataset.picked_data
+        dataset = self.data.picked
         conf_wo_augment = self.conf.data_conf.clone()
         conf_wo_augment.trans_conf = None
-        dataset_ref = self.data_cls(conf_wo_augment).picked_data
+        dataset_ref = conf_wo_augment.make_dateset().picked
 
         target_dir = f'figs/picked/{self.conf.name}'
         if not os.path.exists(target_dir):
@@ -254,10 +217,10 @@ class Experiment:
         self.generate_heatmap(dataset, dataset_ref, target_dir)
 
     def generate_all_heatmap(self):
-        dataset = self.dataset.test_data
+        dataset = self.data.test
         conf_wo_augment = self.conf.data_conf.clone()
         conf_wo_augment.trans_conf = None
-        dataset_ref = self.data_cls(conf_wo_augment).test_data
+        dataset_ref = conf_wo_augment.make_dateset().test
 
         target_dir = f'figs/all/{self.conf.name}'
         if not os.path.exists(target_dir):
@@ -276,9 +239,8 @@ class Experiment:
             dataset_ref: original resolution without augmentation
         """
         assert len(dataset) == len(dataset_ref)
-        loader = self.make_loader(dataset,
-                                  shuffle=False,
-                                  collate_fn=bbox_collate_fn)
+        loader = ConvertLoader(self.data.make_loader(dataset, shuffle=False),
+                               device=self.conf.device)
         trainer = self.load_trainer()
         # predict the segments
         predictor = BasePredictor(
@@ -368,8 +330,8 @@ class Experiment:
                 break
 
     def warm_dataset(self):
-        train_warm_loader = self.make_loader(self.dataset.train_data,
-                                             shuffle=False)
+        train_warm_loader = self.data.make_loader(self.data.train,
+                                                  shuffle=False)
         for each in tqdm(train_warm_loader):
             pass
         for each in tqdm(self.val_loader):
@@ -377,16 +339,51 @@ class Experiment:
         for each in tqdm(self.test_loader):
             pass
 
-    def make_loader(self, dataset, shuffle, **kwargs):
-        return ConvertLoader(
-            DataLoader(
-                dataset,
-                batch_size=self.conf.bs,
-                num_workers=self.conf.n_worker,
-                shuffle=shuffle,
-                multiprocessing_context=(mp.get_context('fork')
-                                         if self.conf.n_worker > 0 else None),
-                **kwargs,
-            ),
-            device=self.conf.device,
-        )
+
+class Run:
+    def __init__(
+        self,
+        namespace: str = '',
+        debug: bool = False,
+        warm: bool = False,
+        train: bool = True,
+        test_auc: bool = True,
+        test_loc: bool = False,
+        gen_picked: bool = False,
+        gen_all: bool = False,
+    ) -> None:
+        self.namespace = namespace
+        self.debug = debug
+        self.warm = warm
+        self.train = train
+        self.test_auc = test_auc
+        self.test_loc = test_loc
+        self.gen_picked = gen_picked
+        self.gen_all = gen_all
+
+    def __call__(self, conf: Config):
+        if self.debug:
+            conf.debug = True
+            conf.do_save = False
+            conf.resume = False
+        else:
+            conf.log_to_file = True
+        with global_queue(enable=not conf.debug, namespace=self.namespace):
+            with cuda_round_robin(enable=not conf.debug,
+                                  namespace=self.namespace) as conf.device:
+                with redirect_to_file(enable=conf.log_to_file):
+                    print(conf.name)
+                    exp = conf.make_experiment()
+                    if self.warm:
+                        exp.warm_dataset()
+                    if self.train:
+                        exp.train()
+                    if self.test_auc:
+                        exp.test_auc()
+                    if self.test_loc:
+                        exp.test_loc()
+                    if conf.seed == 0:
+                        if self.gen_picked:
+                            exp.generate_picked_heatmap()
+                        if self.gen_all:
+                            exp.generate_all_heatmap()
