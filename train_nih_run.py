@@ -29,6 +29,7 @@ if __name__ == "__main__":
             test_auc=True,
             test_loc=True,
             gen_picked=True,
+            gen_all=False,
         ),
         confs,
         num_workers=len(confs),
