@@ -86,21 +86,35 @@ data/voc2012
 
 The main run files are `train_nih_run.py` (see `train_nih.py` for reference), `train_vin_run.py` (see `train_vin.py` for reference), and `train_voc_run.py` (see `train_voc.py` for reference). The files describe experiments to be run. They are straightforward to edit. Make changes or read before you run:
 
+
+#### NIH's Chest X-Ray 14
+
 ```
 python train_nih_run.py
 ```
 
-And
+#### VinDr-CXR 
 
 ```
 python train_vin_run.py
 ```
 
-And
+#### Pascal VOC2012
 
 ```
 python train_voc_run.py
 ```
+
+In order to compare with a wide-range of CAM methods, run the following scripts:
+
+```
+python eval_cam.py
+```
+
+The results will be shown at `eval_loc/<cam_mode>/<model_name>`
+
+
+#### See the stats
 
 Stats will be available at `eval_auc` and `eval_loc`. 
 
@@ -120,3 +134,4 @@ You can change the config in `mlkitenv.json`:
     "global_lock": 1
 }
 ```
+
