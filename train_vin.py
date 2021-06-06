@@ -1,51 +1,65 @@
 from trainer.start import *
-
-from data.vin_data import *
-from utils.callbacks import *
-from utils.heatmap import *
-from utils.localization import *
-from utils.csv import *
 from utils.exp_base import *
+from train_nih import *
 
 
 @dataclass
 class VinConfig(Config):
-    data_conf: VinDataConfig = VinDataConfig(split='v3')
-    net_conf: PylonCustomConfig = None
     n_ep: int = 100
+    data_conf: VinDataConfig = VinDataConfig(bs=64, split='v3')
+    net_conf: UnionModelConfig = None
     n_eval_ep_cycle: int = 3
-    lr: float = 1e-4
-    rop_patience: int = 1
-    rop_factor: float = 0.2
-    log_to_file: bool = False
+    pre_conf: 'VinConfig' = None
+
+    @property
+    def name(self):
+        if self.save_dir is not None:
+            return self.save_dir
+        a = f'{self.data_conf.name}'
+        b = f'{self.net_conf.name}'
+        if self.optimizier == 'pylonadam':
+            b += f'_pylonadam_lr({",".join(str(lr) for lr in self.lr)})'
+        else:
+            b += f'_lr{self.lr}'
+        b += f'term{self.lr_term}rop{self.rop_patience}fac{self.rop_factor}'
+        if self.fp16:
+            b += f'_fp16'
+        c = f'{self.seed}'
+        return '/'.join([a, b, c])
+
+    def make_experiment(self):
+        return VinExperiment(self)
 
 
 class VinExperiment(Experiment):
     def __init__(self, conf: VinConfig) -> None:
-        super().__init__(conf, VinCombinedDataset, Trainer)
+        super().__init__(conf, Trainer)
         self.conf = conf
 
     def make_dataset(self):
-        self.dataset = VinCombinedDataset(self.conf.data_conf)
-        self.train_loader = self.make_loader(self.dataset.train_data,
-                                             shuffle=True,
-                                             collate_fn=bbox_collate_fn)
-        self.val_loader = self.make_loader(self.dataset.val_data,
-                                           shuffle=False,
-                                           collate_fn=bbox_collate_fn)
-        self.test_loader = self.make_loader(self.dataset.test_data,
-                                            shuffle=False,
-                                            collate_fn=bbox_collate_fn)
+        self.data = self.conf.data_conf.make_dataset()
+        self.train_loader = ConvertLoader(
+            self.data.make_loader(self.data.train, shuffle=True),
+            device=self.conf.device,
+        )
+        self.val_loader = ConvertLoader(
+            self.data.make_loader(self.data.val, shuffle=False),
+            device=self.conf.device,
+        )
+        self.test_loader = ConvertLoader(
+            self.data.make_loader(self.data.test, shuffle=False),
+            device=self.conf.device,
+        )
 
-    def make_callbacks(self):
-        cls_id_to_name = self.dataset.test_data.id_to_cls
-        return super().make_callbacks() + [
+    def make_callbacks(self, trainer: Trainer):
+        cls_id_to_name = self.data.test.id_to_cls
+        return super().make_callbacks(trainer) + [
             ValidateCb(
                 self.val_loader,
                 n_ep_cycle=self.conf.n_eval_ep_cycle,
                 name='val',
                 callbacks=[
-                    AvgCb('loss'),
+                    AvgCb(trainer.metrics),
                     AUROCCb(
                         keys=('pred', 'classification'),
                         cls_id_to_name=cls_id_to_name,
@@ -59,214 +73,148 @@ class VinExperiment(Experiment):
             ),
         ]
 
-    def warm_dataset(self):
-        train_warm_loader = self.make_loader(self.dataset.train_data,
-                                             shuffle=False,
-                                             collate_fn=bbox_collate_fn)
-        for each in tqdm(train_warm_loader):
-            pass
-        for each in tqdm(self.val_loader):
-            pass
-        for each in tqdm(self.test_loader):
-            pass
 
-
-def vin_256_baseline():
-    out = []
-    for seed in range(5):
-        out.append(
-            VinConfig(
-                seed=seed,
-                net_conf=BaselineModelConfig(n_out=15),
-            ))
-    return out
-
-
-def vin_256_baseline_pretrain():
-    out = []
-    for seed in range(5):
-        out.append(
-            VinConfig(
-                seed=seed,
-                net_conf=BaselineModelConfig(
-                    n_out=15,
-                    pretrain_conf=PretrainConfig(
-                        pretrain_name='baseline,nih14,256',
-                        prefix='net.',
-                    ),
-                ),
-            ))
-    return out
-
-
-def vin_256_li2018():
-    out = []
-    for seed in range(5):
-        out.append(VinConfig(
+def vin_baseline(seed, size=256, bs=64):
+    return [
+        VinConfig(
             seed=seed,
+            data_conf=VinDataConfig(bs=bs,
+                                    trans_conf=XRayTransformConfig(size=size)),
+            net_conf=BaselineModelConfig(n_out=15),
+        )
+    ]
+
+
+def vin_li2018(seed, size=256, bs=64):
+    return [
+        VinConfig(
+            seed=seed,
+            data_conf=VinDataConfig(bs=bs,
+                                    trans_conf=XRayTransformConfig(size=size)),
             net_conf=Li2018Config(n_out=15),
+        )
+    ]
+
+
+def vin_fpn(seed,
+            size=256,
+            bs=64,
+            segment_block='custom',
+            use_norm='batchnorm',
+            n_group=None):
+    """
+    Args:
+        segment_block: 'original', 'custom'
+        use_norm: 'batchnorm', 'groupnorm' (on with 'custom')
+    """
+    return [
+        VinConfig(
+            seed=seed,
+            data_conf=VinDataConfig(bs=bs,
+                                    trans_conf=XRayTransformConfig(size=size)),
+            net_conf=FPNConfig(n_out=15,
+                               segment_block=segment_block,
+                               use_norm=use_norm,
+                               n_group=n_group),
+        )
+    ]
+
+
+def vin_pylon(seed, size=256, bs=64, up_type='2layer', **kwargs):
+    return [
+        VinConfig(
+            seed=seed,
+            data_conf=VinDataConfig(bs=bs,
+                                    trans_conf=XRayTransformConfig(size=size)),
+            net_conf=PylonConfig(n_in=1, n_out=15, up_type=up_type, **kwargs),
+        )
+    ]
+
+
+def vin_baseline_transfer(seed, size=256, bs=64):
+    out = []
+    pre_conf = nih_baseline(seed, size, bs)[0]
+    out.append(
+        VinConfig(
+            seed=seed,
+            data_conf=VinDataConfig(bs=bs,
+                                    trans_conf=XRayTransformConfig(size=size)),
+            net_conf=BaselineModelConfig(
+                n_out=15,
+                pretrain_conf=PretrainConfig(
+                    pretrain_name='nih',
+                    path=get_pretrain_path(pre_conf.name),
+                ),
+            ),
+            pre_conf=pre_conf,
         ))
     return out
 
 
-def vin_256_fpn():
+def vin_pylon_transfer(seed, size=256, bs=64, up_type='2layer', **kwargs):
     out = []
-    for seed in range(5):
-        out.append(
-            VinConfig(
-                seed=seed,
-                net_conf=FPNConfig(n_out=15,
-                                   segment_block='custom',
-                                   use_norm='batchnorm'),
-            ))
-    return out
-
-
-def vin_256_pylon():
-    out = []
-    for seed in range(5):
-        out.append(
-            VinConfig(
-                seed=seed,
-                net_conf=PylonConfig(n_out=14, up_type='2layer'),
-            ))
-    return out
-
-
-def vin_256_pretrain():
-    out = []
-
-    # normal transfer from pylon
-    for seed in range(5):
-        out.append(
-            VinConfig(
-                seed=seed,
-                net_conf=PylonConfig(
-                    n_out=15,
-                    pretrain_conf=PretrainConfig(
-                        pretrain_name='pylon,nih,256'),
-                ),
-            ))
-
-    # two-phase
-    for seed in range(5):
-        pre_conf = VinConfig(
+    pre_conf = nih_pylon(seed, size, bs, up_type, **kwargs)[0]
+    out.append(
+        VinConfig(
             seed=seed,
+            data_conf=VinDataConfig(bs=bs,
+                                    trans_conf=XRayTransformConfig(size=size)),
             net_conf=PylonConfig(
+                n_in=1,
                 n_out=15,
-                pretrain_conf=PretrainConfig(pretrain_name='pylon,nih,256'),
-                freeze='enc',
-            ),
-        )
-        out.append(
-            VinConfig(
-                seed=seed,
-                net_conf=PylonConfig(
-                    n_out=15,
-                    pretrain_conf=PretrainConfig(
-                        pretrain_name='twophase',
-                        path=get_pretrain_path(pre_conf.name),
-                    ),
+                up_type=up_type,
+                **kwargs,
+                pretrain_conf=PretrainConfig(
+                    pretrain_name='nih',
+                    path=get_pretrain_path(pre_conf.name),
                 ),
-                pre_conf=pre_conf,
-            ))
-
+            ),
+            pre_conf=pre_conf,
+        ))
     return out
 
 
-def vin_512_baseline():
+def vin_pylon_transfer_two_phase(seed,
+                                 size=256,
+                                 bs=64,
+                                 up_type='2layer',
+                                 **kwargs):
     out = []
-    for seed in range(5):
-        out.append(
-            VinConfig(
-                seed=seed,
-                data_conf=VinDataConfig(split='v3',
-                                        trans_conf=TransformConfig(size=512)),
-                net_conf=BaselineModelConfig(n_out=15),
-            ))
+    # train on NIH
+    pre_conf = nih_pylon(seed, size, bs, up_type, **kwargs)[0]
+    # train only the decoder
+    data_conf = VinDataConfig(bs=bs, trans_conf=XRayTransformConfig(size=size))
+    first_phase_conf = VinConfig(
+        seed=seed,
+        data_conf=data_conf,
+        net_conf=PylonConfig(
+            n_in=1,
+            n_out=15,
+            up_type=up_type,
+            **kwargs,
+            pretrain_conf=PretrainConfig(
+                pretrain_name='nih',
+                path=get_pretrain_path(pre_conf.name),
+            ),
+            freeze='enc',
+        ),
+        pre_conf=pre_conf,
+    )
+    # train all
+    out.append(
+        VinConfig(
+            seed=seed,
+            data_conf=data_conf,
+            net_conf=PylonConfig(
+                n_in=1,
+                n_out=15,
+                up_type=up_type,
+                **kwargs,
+                pretrain_conf=PretrainConfig(
+                    pretrain_name='nih,twophase',
+                    path=get_pretrain_path(first_phase_conf.name),
+                ),
+            ),
+            pre_conf=first_phase_conf,
+        ))
     return out
-
-
-def vin_512_li2018():
-    out = []
-    for seed in range(5):
-        out.append(
-            VinConfig(
-                seed=seed,
-                data_conf=VinDataConfig(split='v3',
-                                        trans_conf=TransformConfig(size=512)),
-                net_conf=Li2018Config(n_out=15),
-            ))
-    return out
-
-
-def vin_512_fpn():
-    out = []
-    for seed in range(5):
-        out.append(
-            VinConfig(
-                seed=seed,
-                data_conf=VinDataConfig(split='v3',
-                                        trans_conf=TransformConfig(size=512)),
-                net_conf=FPNConfig(n_out=15,
-                                   segment_block='custom',
-                                   use_norm='batchnorm'),
-            ))
-    return out
-
-
-def vin_512_pylon():
-    out = []
-    for seed in range(5):
-        out.append(
-            VinConfig(
-                seed=seed,
-                data_conf=VinDataConfig(split='v3',
-                                        trans_conf=TransformConfig(size=512)),
-                net_conf=PylonConfig(n_out=15),
-            ))
-    return out
-
-
-def run_exp(conf: VinConfig):
-    # conf.debug = True
-    # conf.do_save = False
-    # conf.resume = False
-    # conf.log_to_file = False
-    with global_queue(n=ENV.global_lock or 1,
-                      enable=not conf.debug,
-                      namespace=ENV.namespace):
-        with cuda_round_robin(enable=not conf.debug,
-                              namespace=ENV.namespace) as conf.device:
-            with redirect_to_file(enable=conf.log_to_file):
-                print(conf.name)
-                exp = VinExperiment(conf)
-                # exp.warm_dataset()
-                exp.train()
-                exp.test_auc()
-                exp.test_loc()
-                if conf.seed == 0:
-                    exp.generate_picked_heatmap()
-                    exp.generate_all_heatmap()
-
-
-if __name__ == "__main__":
-    confs = []
-    # confs += vin_256_baseline()
-    # confs += vin_256_li2018()
-    # confs += vin_256_pylon()
-    # confs += vin_256_fpn()
-
-    # confs += vin_256_baseline_pretrain()
-    # confs += vin_256_pretrain()
-
-    # confs += vin_512_baseline()
-    # confs += vin_512_li2018()
-    # confs += vin_512_pylon()
-    # confs += vin_512_fpn()
-
-    multiprocess_map(run_exp,
-                     confs,
-                     num_workers=len(confs),
-                     progress=True,
-                     debug=False)

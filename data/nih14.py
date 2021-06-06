@@ -1,3 +1,4 @@
+from data.common import BaseCombinedDataset
 import os
 from collections import defaultdict
 from dataclasses import dataclass
@@ -50,42 +51,45 @@ BBOX_CLS_NAME_TO_ID = {
 
 @dataclass
 class NIH14DataConfig(BaseConfig):
-    trans_conf: TransformConfig = TransformConfig(mean=MEAN, std=SD)
+    bs: int = 1
+    n_worker: int = ENV.num_workers
+    trans_conf: XRayTransformConfig = XRayTransformConfig(mean=MEAN, std=SD)
 
     @property
     def name(self):
-        return f'nih14_{self.trans_conf.name}'
+        return f'bs{self.bs}_nih14_{self.trans_conf.name}'
+
+    def make_dataset(self):
+        return NIH14CombinedDataset(self)
 
 
-class NIH14CombinedDataset:
+class NIH14CombinedDataset(BaseCombinedDataset):
     """Using the original test split, the train is around 70%, the val is <10%
     """
     def __init__(self, conf: NIH14DataConfig):
         self.conf = conf
         images_path = f'{here}/nih14/images'
         if conf.trans_conf is not None:
-            train_transform = make_transform('train', conf.trans_conf)
-            eval_transform = make_transform('eval', conf.trans_conf)
+            train_transform = conf.trans_conf.make_transform('train')
+            eval_transform = conf.trans_conf.make_transform('eval')
         else:
             train_transform = None
             eval_transform = None
-        self.train_data = NIH14Dataset(
-            f'{here}/nih14/original_split_train.csv', images_path,
-            train_transform)
-        self.val_data = NIH14Dataset(f'{here}/nih14/original_split_val.csv',
-                                     images_path, eval_transform)
-        self.test_data = NIH14Dataset(f'{here}/nih14/original_split_test.csv',
-                                      images_path, eval_transform)
+        self.train = NIH14Dataset(f'{here}/nih14/original_split_train.csv',
+                                  images_path, train_transform)
+        self.val = NIH14Dataset(f'{here}/nih14/original_split_val.csv',
+                                images_path, eval_transform)
+        self.test = NIH14Dataset(f'{here}/nih14/original_split_test.csv',
+                                 images_path, eval_transform)
         self.test_bbox = NIH14Dataset(
             f'{here}/nih14/bbox_only.csv',
             images_path,
             eval_transform,
             bbox_csv=f'{here}/nih14/BBox_List_2017.csv')
-        self.picked_data = NIH14Dataset(
-            f'{here}/nih14/picked.csv',
-            images_path,
-            eval_transform,
-            bbox_csv=f'{here}/nih14/BBox_List_2017.csv')
+        self.picked = NIH14Dataset(f'{here}/nih14/picked.csv',
+                                   images_path,
+                                   eval_transform,
+                                   bbox_csv=f'{here}/nih14/BBox_List_2017.csv')
 
 
 def make_coco_bbox_from_df(df, cls_name_map):
@@ -147,14 +151,3 @@ def cv2_loader(path):
     img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
     assert img is not None, f'cannot read {path}'
     return img
-
-
-def bbox_collate_fn(data):
-    out = {'img': [], 'classification': [], 'bboxes': []}
-    for each in data:
-        out['img'].append(each['img'])
-        out['classification'].append(each['classification'])
-        out['bboxes'].append(each['bboxes'])
-    out['img'] = torch.stack(out['img'])
-    out['classification'] = torch.stack(out['classification'])
-    return out

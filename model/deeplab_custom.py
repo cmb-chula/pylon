@@ -6,6 +6,8 @@ from segmentation_models_pytorch.deeplabv3 import decoder
 from segmentation_models_pytorch.encoders import get_encoder
 from trainer.start import *
 
+from .common import *
+
 
 @dataclass
 class Deeplabv3CustomConfig(BaseConfig):
@@ -16,8 +18,6 @@ class Deeplabv3CustomConfig(BaseConfig):
     aspp_mode: str = 'original'
     dilate: bool = False
     weights: str = 'imagenet'
-    pretrain_name: str = None
-    pretrain_prefix: str = None
 
     @property
     def name(self):
@@ -25,8 +25,6 @@ class Deeplabv3CustomConfig(BaseConfig):
         name += f'-{self.aspp_mode}'
         if self.weights is not None:
             name += f'-{self.weights}'
-        if self.pretrain_name is not None:
-            name += f'-w{self.pretrain_name}'
         return name
 
 
@@ -42,31 +40,46 @@ class Deeplabv3Custom(nn.Module):
                                        aspp_mode=conf.aspp_mode)
         self.pool = nn.AdaptiveMaxPool2d(1)
 
-    def forward(self, x):
-        seg = self.net(x).float()
-        x = self.pool(seg)
-        x = torch.flatten(x, 1)
-        return {
-            'pred': x,
-            'seg': seg,
-        }
+    def forward(self, img, classification=None, **kwargs):
+        # enforce float32 is a good idea
+        # because if the loss function involves a reduction operation
+        # it would be harmful, this prevents the problem
+        seg = self.net(img).float()
+        pred = self.pool(seg)
+        pred = torch.flatten(pred, start_dim=1)
+
+        loss = None
+        loss_pred = None
+        loss_bbox = None
+        if classification is not None:
+            loss_pred = F.binary_cross_entropy_with_logits(
+                pred, classification.float())
+            loss = loss_pred
+
+        return ModelReturn(
+            pred=pred,
+            pred_seg=seg,
+            loss=loss,
+            loss_pred=loss_pred,
+            loss_bbox=loss_bbox,
+        )
 
 
 class DeepLabV3PlusCustom(SegmentationModel):
     def __init__(
-            self,
-            encoder_name: str = "resnet34",
-            encoder_depth: int = 5,
-            encoder_weights: Optional[str] = "imagenet",
-            encoder_output_stride: int = 16,
-            decoder_channels: int = 256,
-            decoder_atrous_rates: tuple = (12, 24, 36),
-            in_channels: int = 3,
-            classes: int = 1,
-            activation: Optional[str] = None,
-            upsampling: int = 4,
-            aux_params: Optional[dict] = None,
-            aspp_mode='original',
+        self,
+        encoder_name: str = "resnet34",
+        encoder_depth: int = 5,
+        encoder_weights: Optional[str] = "imagenet",
+        encoder_output_stride: int = 16,
+        decoder_channels: int = 256,
+        decoder_atrous_rates: tuple = (12, 24, 36),
+        in_channels: int = 3,
+        classes: int = 1,
+        activation: Optional[str] = None,
+        upsampling: int = 4,
+        aux_params: Optional[dict] = None,
+        aspp_mode='original',
     ):
         super().__init__()
 

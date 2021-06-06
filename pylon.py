@@ -1,20 +1,19 @@
-from dataclasses import dataclass
-
-import torch
-import torch.nn.functional as F
 from segmentation_models_pytorch.base import (SegmentationHead,
                                               SegmentationModel)
 from segmentation_models_pytorch.encoders import get_encoder
 from torch import nn
+from trainer.start import *
 from utils.pretrain import *
+
+from model.common import *
 
 
 @dataclass
 class PylonConfig:
+    n_in: int
+    n_out: int
     backbone: str = 'resnet50'
     weights: str = 'imagenet'
-    n_in: int = 1
-    n_out: int = 14
     # number of decoding feature maps
     n_dec_ch: int = 128
     # number of UP modules
@@ -39,8 +38,7 @@ class PylonConfig:
         name = f'pylon-{self.backbone}'
         if not self.use_pa:
             name += '-nopa'
-        if self.up_type != 'v1':
-            name += f'-uptype{self.up_type}'
+        name += f'-uptype{self.up_type}'
         if self.up_kernel_size != 1:
             name += f'-upkern{self.up_kernel_size}'
         if self.n_up != 3:
@@ -56,10 +54,14 @@ class PylonConfig:
             name += f'_{self.pretrain_conf.name}'
         return name
 
+    def make_model(self):
+        return Pylon(self)
+
 
 class Pylon(nn.Module):
     def __init__(self, conf: PylonConfig):
         super(Pylon, self).__init__()
+        self.conf = conf
         self.net = PylonCore(backbone=conf.backbone,
                              n_in=conf.n_in,
                              n_out=conf.n_out,
@@ -81,18 +83,29 @@ class Pylon(nn.Module):
             else:
                 raise NotImplementedError()
 
-    def forward(self, x):
+    def forward(self, img, classification=None, **kwargs):
         # enforce float32 is a good idea
         # because if the loss function involves a reduction operation
         # it would be harmful, this prevents the problem
-        seg = self.net(x).float()
+        seg = self.net(img).float()
         pred = self.pool(seg)
         pred = torch.flatten(pred, start_dim=1)
 
-        return {
-            'pred': pred,
-            'seg': seg,
-        }
+        loss = None
+        loss_pred = None
+        loss_bbox = None
+        if classification is not None:
+            loss_pred = F.binary_cross_entropy_with_logits(
+                pred, classification.float())
+            loss = loss_pred
+
+        return ModelReturn(
+            pred=pred,
+            pred_seg=seg,
+            loss=loss,
+            loss_pred=loss_pred,
+            loss_bbox=loss_bbox,
+        )
 
 
 class PylonCore(SegmentationModel):

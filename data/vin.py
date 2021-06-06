@@ -8,8 +8,9 @@ import torch
 from torch.utils.data import Dataset
 from trainer.config_base import *
 
-from .nih14_data import cv2_loader
+from data.common import BaseCombinedDataset
 
+from .nih14 import cv2_loader
 from .transform import *
 
 cv2.setNumThreads(1)
@@ -62,22 +63,29 @@ SPLITS = {
     ),
 }
 
-IMAGES = {'1024ratio': ('images', 'images_ratio.csv')}
+IMAGES = {
+    '1024ratio': ('images', 'images_ratio.csv')
+}
 
 
 @dataclass
 class VinDataConfig(BaseConfig):
+    bs: int = 1
+    n_worker: int = ENV.num_workers
     image: str = '1024ratio'
     file_ext: str = '.png'
     split: str = 'v3'
-    trans_conf: TransformConfig = TransformConfig(mean=MEAN, std=SD)
+    trans_conf: XRayTransformConfig = XRayTransformConfig(mean=MEAN, std=SD)
 
     @property
     def name(self):
-        return f'vin-{self.image}-{self.split}_{self.trans_conf.name}'
+        return f'bs{self.bs}_vin-{self.image}-{self.split}_{self.trans_conf.name}'
+
+    def make_dataset(self):
+        return VinCombinedDataset(self)
 
 
-class VinCombinedDataset:
+class VinCombinedDataset(BaseCombinedDataset):
     """Using the original test split, the train is around 70%, the val is <10%
     """
     def __init__(self, conf: VinDataConfig):
@@ -87,8 +95,8 @@ class VinCombinedDataset:
         ratio_csv = f'{here}/vin/{ratio_csv}'
 
         if conf.trans_conf is not None:
-            train_transform = make_transform('train', conf.trans_conf)
-            eval_transform = make_transform('eval', conf.trans_conf)
+            train_transform = conf.trans_conf.make_transform('train')
+            eval_transform = conf.trans_conf.make_transform('eval')
         else:
             train_transform = None
             eval_transform = None
@@ -98,30 +106,30 @@ class VinCombinedDataset:
         # preload and convert the bounding box
         bbox_df = pd.read_csv(bbox_csv)
         bbox = make_coco_bbox_from_df(bbox_df, CLS_TO_ID)
-        self.train_data = VinDataset(f'{here}/vin/{train}',
-                                     images_path,
-                                     train_transform,
-                                     bbox=bbox,
-                                     ratio_csv=ratio_csv,
-                                     file_ext=conf.file_ext)
-        self.val_data = VinDataset(f'{here}/vin/{val}',
-                                   images_path,
-                                   eval_transform,
-                                   bbox=bbox,
-                                   ratio_csv=ratio_csv,
-                                   file_ext=conf.file_ext)
-        self.test_data = VinDataset(f'{here}/vin/{test}',
-                                    images_path,
-                                    eval_transform,
-                                    bbox=bbox,
-                                    ratio_csv=ratio_csv,
-                                    file_ext=conf.file_ext)
-        self.picked_data = VinDataset(f'{here}/vin/{picked}',
-                                      images_path,
-                                      eval_transform,
-                                      bbox=bbox,
-                                      ratio_csv=ratio_csv,
-                                      file_ext=conf.file_ext)
+        self.train = VinDataset(f'{here}/vin/{train}',
+                                images_path,
+                                train_transform,
+                                bbox=bbox,
+                                ratio_csv=ratio_csv,
+                                file_ext=conf.file_ext)
+        self.val = VinDataset(f'{here}/vin/{val}',
+                              images_path,
+                              eval_transform,
+                              bbox=bbox,
+                              ratio_csv=ratio_csv,
+                              file_ext=conf.file_ext)
+        self.test = VinDataset(f'{here}/vin/{test}',
+                               images_path,
+                               eval_transform,
+                               bbox=bbox,
+                               ratio_csv=ratio_csv,
+                               file_ext=conf.file_ext)
+        self.picked = VinDataset(f'{here}/vin/{picked}',
+                                 images_path,
+                                 eval_transform,
+                                 bbox=bbox,
+                                 ratio_csv=ratio_csv,
+                                 file_ext=conf.file_ext)
 
 
 def make_coco_bbox_from_df(df, cls_name_to_id):

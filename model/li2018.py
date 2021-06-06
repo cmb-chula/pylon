@@ -1,6 +1,8 @@
 from trainer.start import *
 from segmentation_models_pytorch.encoders import get_encoder
 
+from .common import *
+
 
 @dataclass
 class Li2018Config(BaseConfig):
@@ -12,8 +14,6 @@ class Li2018Config(BaseConfig):
     pooling: str = 'milpool'
     min_val: float = 0.98
     weights: str = 'imagenet'
-    pretrain_name: str = None
-    pretrain_prefix: str = None
 
     @property
     def name(self):
@@ -24,9 +24,10 @@ class Li2018Config(BaseConfig):
             name += f'-{self.pooling}'
         if self.weights is not None:
             name += f'-{self.weights}'
-        if self.pretrain_name is not None:
-            name += f'-w{self.pretrain_name}'
         return name
+
+    def make_model(self):
+        return Li2018(self)
 
 
 class Li2018(nn.Module):
@@ -54,16 +55,29 @@ class Li2018(nn.Module):
         }
         self.pool = pooling_opts[conf.pooling]
 
-    def forward(self, x):
-        # select the last layer
-        x = self.net(x)[-1]
-        seg = self.out(x).float()
+    def forward(self, img, classification=None, **kwargs):
+        # enforce float32 is a good idea
+        # because if the loss function involves a reduction operation
+        # it would be harmful, this prevents the problem
+        seg = self.net(img)[-1]
+        seg = self.out(seg).float()
         pred = self.pool(seg)
-        pred = torch.flatten(pred, 1)
-        return {
-            'pred': pred,
-            'seg': seg,
-        }
+        pred = torch.flatten(pred, start_dim=1)
+
+        loss = None
+        loss_pred = None
+        if classification is not None:
+            loss_pred = F.binary_cross_entropy_with_logits(
+                pred, classification.float())
+            loss = loss_pred
+
+        return ModelReturn(
+            pred=pred,
+            pred_seg=seg,
+            loss=loss,
+            loss_pred=loss_pred,
+            loss_bbox=None,
+        )
 
 
 def mil_output(p, min_val):

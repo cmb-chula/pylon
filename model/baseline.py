@@ -1,6 +1,8 @@
-from trainer.start import *
 from segmentation_models_pytorch.encoders import get_encoder
+from trainer.start import *
 from utils.pretrain import *
+
+from .common import *
 
 
 @dataclass
@@ -10,7 +12,7 @@ class BaselineModelConfig(BaseConfig):
     n_in: int = 1
     weights: str = 'imagenet'
     pooling: str = 'maxpool'
-    pretrain_conf: PretrainConfig() = None
+    pretrain_conf: PretrainConfig = None
 
     @property
     def name(self):
@@ -20,6 +22,9 @@ class BaselineModelConfig(BaseConfig):
         if self.pretrain_conf is not None:
             name += f'-{self.pretrain_conf.name}'
         return name
+
+    def make_model(self):
+        return BaselineModel(self)
 
 
 class BaselineModel(nn.Module):
@@ -46,13 +51,40 @@ class BaselineModel(nn.Module):
         if conf.pretrain_conf is not None:
             load_pretrain(conf.pretrain_conf, target=self)
 
-    def forward(self, x):
+    def forward(self, img, classification=None, **kwargs):
         # select the last layer
-        x = self.net(x)[-1]
-        seg = self.out(x).float()
-        pred = self.pool(seg)
-        pred = torch.flatten(pred, 1)
-        return {
-            'pred': pred,
-            'seg': seg,
-        }
+        feat = self.net(img)[-1]
+        if self.conf.pooling == 'maxpool':
+            # (bs, cls, h, w)
+            seg = self.out(feat).float()
+            # (bs, cls, 1, 1)
+            pred = self.pool(seg)
+            # (bs, cls)
+            pred = torch.flatten(pred, 1)
+        elif self.conf.pooling == 'avgpool':
+            # (bs, c, 1, 1)
+            pred = self.pool(feat)
+            # (bs, cls, 1, 1)
+            pred = self.out(pred).float()
+            # (bs, cls)
+            pred = torch.flatten(pred, 1)
+            # (bs, cls, h, w)
+            seg = self.out(feat).float()
+        else:
+            raise NotImplementedError()
+
+        loss = None
+        loss_pred = None
+        loss_bbox = None
+        if classification is not None:
+            loss_pred = F.binary_cross_entropy_with_logits(
+                pred, classification.float())
+            loss = loss_pred
+
+        return ModelReturn(
+            pred=pred,
+            pred_seg=seg,
+            loss=loss,
+            loss_pred=loss_pred,
+            loss_bbox=loss_bbox,
+        )
