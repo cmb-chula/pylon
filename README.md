@@ -43,6 +43,12 @@ From the paper, "High resolution weakly supervised localization architectures fo
 
 It was tested with Pytorch 1.7.1.
 
+```
+conda create -n pylon python=3.7
+conda activate pylon
+conda install pytorch=1.7.1 torchvision cudatoolkit=11.0 -c pytorch
+```
+
 Install other related libraries:
 
 ```
@@ -63,20 +69,37 @@ Download the DICOM version from Kaggle https://www.kaggle.com/c/vinbigdata-chest
 
 You need to convert them into PNG. The script is provided in `scripts/convert_dcm_to_png.py`. The conversion will not alter the aspect ratio it will aim for maximum 1024 either width or height.
 
-Put all the PNG files into directory `data/vin/images`.
+Put all the PNG files into directory `data/vin/images`. The final directory structures:
+
+#### Pascal VOC2012
+
+Download the dataset from http://host.robots.ox.ac.uk/pascal/VOC/voc2012/. (Only train & val datasets)
+
+Extract it to `data/voc2012`. You should see the following directory structures:
+
+```
+data/voc2012
+- VOCdevkit
+```
 
 ### Run
 
-The main run files are `train_nih.py` and `train_vin.py`. The files are straightforward to edit. Make changes or read before you run:
+The main run files are `train_nih_run.py` (see `train_nih.py` for reference), `train_vin_run.py` (see `train_vin.py` for reference), and `train_voc_run.py` (see `train_voc.py` for reference). The files describe experiments to be run. They are straightforward to edit. Make changes or read before you run:
 
 ```
-python train_nih.py
+python train_nih_run.py
 ```
 
 And
 
 ```
-python train_vin.py
+python train_vin_run.py
+```
+
+And
+
+```
+python train_voc_run.py
 ```
 
 Stats will be available at `eval_auc` and `eval_loc`. 
