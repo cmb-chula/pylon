@@ -1,0 +1,5 @@
+{
+    "cuda": [0],
+    "num_workers": 8,
+    "global_lock": 1
+}
