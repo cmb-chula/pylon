@@ -6,6 +6,8 @@ from segmentation_models_pytorch.encoders import get_encoder
 from segmentation_models_pytorch.fpn.decoder import *
 from trainer.start import *
 
+from .common import *
+
 
 @dataclass
 class FPNConfig(BaseConfig):
@@ -21,8 +23,6 @@ class FPNConfig(BaseConfig):
     use_norm: str = 'groupnorm'
     n_group: int = 32
     decoder_activation: str = 'relu'
-    pretrain_name: str = None
-    pretrain_prefix: str = None
 
     @property
     def name(self):
@@ -38,14 +38,16 @@ class FPNConfig(BaseConfig):
             name += f'-{self.decoder_activation}'
         if self.weights is not None:
             name += f'-{self.weights}'
-        if self.pretrain_name is not None:
-            name += f'-w{self.pretrain_name}'
         return name
+
+    def make_model(self):
+        return FPN(self)
 
 
 class FPN(nn.Module):
     def __init__(self, conf: FPNConfig):
         super().__init__()
+        self.conf = conf
         self.net = FPNCustom(
             conf.backbone,
             in_channels=conf.n_in,
@@ -62,36 +64,51 @@ class FPN(nn.Module):
         )
         self.pool = nn.AdaptiveMaxPool2d(1)
 
-    def forward(self, x):
-        seg = self.net(x).float()
-        x = self.pool(seg)
-        x = torch.flatten(x, 1)
-        return {
-            'pred': x,
-            'seg': seg,
-        }
+    def forward(self, img, classification=None, **kwargs):
+        # enforce float32 is a good idea
+        # because if the loss function involves a reduction operation
+        # it would be harmful, this prevents the problem
+        seg = self.net(img).float()
+        pred = self.pool(seg)
+        pred = torch.flatten(pred, start_dim=1)
+
+        loss = None
+        loss_pred = None
+        loss_bbox = None
+        if classification is not None:
+            loss_pred = F.binary_cross_entropy_with_logits(
+                pred, classification.float())
+            loss = loss_pred
+
+        return ModelReturn(
+            pred=pred,
+            pred_seg=seg,
+            loss=loss,
+            loss_pred=loss_pred,
+            loss_bbox=loss_bbox,
+        )
 
 
 class FPNCustom(SegmentationModel):
     def __init__(
-            self,
-            encoder_name: str = "resnet34",
-            encoder_depth: int = 5,
-            encoder_weights: Optional[str] = "imagenet",
-            decoder_pyramid_channels: int = 256,
-            decoder_segmentation_channels: int = 128,
-            decoder_dropout: float = 0.2,
-            in_channels: int = 3,
-            classes: int = 1,
-            activation: Optional[str] = None,
-            upsampling: int = 4,
-            aux_params: Optional[dict] = None,
-            segment_block='original',
-            use_norm='groupnorm',
-            decoder_activation='relu',
-            decoder_negative_slope=0.01,
-            n_group=32,
-            **kwargs,
+        self,
+        encoder_name: str = "resnet34",
+        encoder_depth: int = 5,
+        encoder_weights: Optional[str] = "imagenet",
+        decoder_pyramid_channels: int = 256,
+        decoder_segmentation_channels: int = 128,
+        decoder_dropout: float = 0.2,
+        in_channels: int = 3,
+        classes: int = 1,
+        activation: Optional[str] = None,
+        upsampling: int = 4,
+        aux_params: Optional[dict] = None,
+        segment_block='original',
+        use_norm='groupnorm',
+        decoder_activation='relu',
+        decoder_negative_slope=0.01,
+        n_group=32,
+        **kwargs,
     ):
         super().__init__()
 
@@ -135,18 +152,18 @@ class FPNCustom(SegmentationModel):
 
 class FPNDecoder(nn.Module):
     def __init__(
-            self,
-            encoder_channels,
-            encoder_depth=5,
-            pyramid_channels=256,
-            segmentation_channels=128,
-            segment_block='original',
-            dropout=0.2,
-            merge_policy="add",
-            use_norm='groupnorm',
-            activation='relu',
-            negative_slope=0.01,
-            n_group=32,
+        self,
+        encoder_channels,
+        encoder_depth=5,
+        pyramid_channels=256,
+        segmentation_channels=128,
+        segment_block='original',
+        dropout=0.2,
+        merge_policy="add",
+        use_norm='groupnorm',
+        activation='relu',
+        negative_slope=0.01,
+        n_group=32,
     ):
         super().__init__()
 

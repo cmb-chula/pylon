@@ -6,7 +6,8 @@ from segmentation_models_pytorch.encoders import get_encoder
 from torch import nn
 from trainer.start import *
 from utils.pretrain import *
-from utils.pretrain import PretrainConfig
+
+from .common import *
 
 
 @dataclass
@@ -19,14 +20,18 @@ class PylonCustomConfig(BaseConfig):
     n_up: int = 3
     only_up: Tuple[int] = (1, 2, 3)
     seg_kern_size: int = 1
+    seg_norm: bool = False
     pa_global_pooling: bool = False
     use_pa: bool = True
     up_global_pooling: bool = False
-    up_type: str = 'v1'
+    up_type: str = 'v3'
     up_kernel_size: int = 1
     extra_linear: bool = False
     dec_ch_relu: bool = True
-    pretrain_conf: PretrainConfig() = None
+    use_bbox_loss: bool = False
+    norm_type: str = 'batchnorm'
+    n_group: int = None
+    pretrain_conf: PretrainConfig = None
     freeze: str = None
 
     @property
@@ -51,15 +56,23 @@ class PylonCustomConfig(BaseConfig):
         name += f'-dec{self.n_dec_ch}'
         if self.seg_kern_size != 1:
             name += f'-segkern{self.seg_kern_size}'
+        if self.seg_norm:
+            name += f'-segnorm'
         if not self.dec_ch_relu:
             name += f'-nodecrelu'
         if self.extra_linear:
             name += f'-linear'
+        if self.norm_type != 'batchnorm':
+            assert self.n_group is not None
+            name += f'-{self.norm_type}{self.n_group}'
         if self.pretrain_conf is not None:
             name += f'-{self.pretrain_conf.name}'
         if self.freeze is not None:
             name += f'-freeze{self.freeze}'
         return name
+
+    def make_model(self):
+        return PylonCustom(self)
 
 
 def pylon_adam_optimizer(net: 'PylonCustom', lrs: Tuple[float]):
@@ -83,6 +96,7 @@ def pylon_adam_optimizer(net: 'PylonCustom', lrs: Tuple[float]):
 class PylonCustom(nn.Module):
     def __init__(self, conf: PylonCustomConfig):
         super(PylonCustom, self).__init__()
+        self.conf = conf
         self.net = PylonCore(conf)
         self.pool = nn.AdaptiveMaxPool2d(1)
 
@@ -99,23 +113,35 @@ class PylonCustom(nn.Module):
         else:
             raise NotImplementedError()
 
-    def forward(self, x):
+    def forward(self, img, classification=None, **kwargs):
         # enforce float32 is a good idea
         # because if the loss function involves a reduction operation
         # it would be harmful, this prevents the problem
-        seg = self.net(x).float()
+        seg = self.net(img).float()
         pred = self.pool(seg)
         pred = torch.flatten(pred, start_dim=1)
 
-        return {
-            'pred': pred,
-            'seg': seg,
-        }
+        loss = None
+        loss_pred = None
+        loss_bbox = None
+        if classification is not None:
+            loss_pred = F.binary_cross_entropy_with_logits(
+                pred, classification.float())
+            loss = loss_pred
+
+        return ModelReturn(
+            pred=pred,
+            pred_seg=seg,
+            loss=loss,
+            loss_pred=loss_pred,
+            loss_bbox=loss_bbox,
+        )
 
 
 class PylonCore(SegmentationModel):
     def __init__(self, conf: PylonCustomConfig):
         super(PylonCore, self).__init__()
+        self.conf = conf
 
         self.encoder = get_encoder(
             conf.backbone,
@@ -130,6 +156,9 @@ class PylonCore(SegmentationModel):
             upscale_mode='bilinear',
             align_corners=True,
         )
+
+        if conf.seg_norm:
+            self.seg_norm = nn.BatchNorm2d(conf.n_dec_ch)
 
         if conf.extra_linear or not conf.dec_ch_relu:
             # bn + relu + conv
@@ -149,6 +178,20 @@ class PylonCore(SegmentationModel):
         # just to comply with SegmentationModel
         self.classification_head = None
         self.initialize()
+
+    def forward(self, x):
+        """Sequentially pass `x` trough model`s encoder, decoder and heads"""
+        features = self.encoder(x)
+        decoder_output = self.decoder(*features)
+        if self.conf.seg_norm:
+            decoder_output = self.seg_norm(decoder_output)
+        masks = self.segmentation_head(decoder_output)
+
+        if self.classification_head is not None:
+            labels = self.classification_head(features[-1])
+            return masks, labels
+
+        return masks
 
 
 class HeadBnReluConv(nn.Module):
@@ -184,6 +227,8 @@ class PylonDecoder(nn.Module):
             extra_linear=conf.extra_linear,
             use_pa=conf.use_pa,
             global_pooling=conf.pa_global_pooling,
+            norm_type=conf.norm_type,
+            n_group=conf.n_group,
         )
 
         kwargs = dict(
@@ -195,6 +240,8 @@ class PylonDecoder(nn.Module):
             up_type=conf.up_type,
             kernel_size=conf.up_kernel_size,
             global_pooling=conf.up_global_pooling,
+            norm_type=conf.norm_type,
+            n_group=conf.n_group,
         )
         if conf.n_up >= 1:
             self.up3 = UP(
@@ -235,6 +282,8 @@ class PA(nn.Module):
         use_pa: bool,
         upscale_mode='bilinear',
         align_corners=True,
+        norm_type: str = 'batchnorm',
+        n_group: int = None,
     ):
         super(PA, self).__init__()
 
@@ -255,6 +304,8 @@ class PA(nn.Module):
                 padding=0,
                 add_bn=mid_relu,
                 add_relu=mid_relu,
+                norm_type=norm_type,
+                n_group=n_group,
             ))
 
         if extra_linear:
@@ -266,50 +317,83 @@ class PA(nn.Module):
         if use_pa:
             self.down1 = nn.Sequential(
                 nn.MaxPool2d(kernel_size=2, stride=2),
-                ConvBnRelu(in_channels=in_channels,
-                           out_channels=1,
-                           kernel_size=7,
-                           stride=1,
-                           padding=3))
+                ConvBnRelu(
+                    in_channels=in_channels,
+                    out_channels=1,
+                    kernel_size=7,
+                    stride=1,
+                    padding=3,
+                    norm_type=norm_type,
+                    n_group=1,
+                ),
+            )
             self.down2 = nn.Sequential(
                 nn.MaxPool2d(kernel_size=2, stride=2),
-                ConvBnRelu(in_channels=1,
-                           out_channels=1,
-                           kernel_size=5,
-                           stride=1,
-                           padding=2))
+                ConvBnRelu(
+                    in_channels=1,
+                    out_channels=1,
+                    kernel_size=5,
+                    stride=1,
+                    padding=2,
+                    norm_type=norm_type,
+                    n_group=1,
+                ),
+            )
             self.down3 = nn.Sequential(
                 nn.MaxPool2d(kernel_size=2, stride=2),
-                ConvBnRelu(in_channels=1,
-                           out_channels=1,
-                           kernel_size=3,
-                           stride=1,
-                           padding=1))
+                ConvBnRelu(
+                    in_channels=1,
+                    out_channels=1,
+                    kernel_size=3,
+                    stride=1,
+                    padding=1,
+                    norm_type=norm_type,
+                    n_group=1,
+                ),
+            )
 
-            self.conv3 = ConvBnRelu(in_channels=1,
-                                    out_channels=1,
-                                    kernel_size=3,
-                                    stride=1,
-                                    padding=1)
-            self.conv2 = ConvBnRelu(in_channels=1,
-                                    out_channels=1,
-                                    kernel_size=5,
-                                    stride=1,
-                                    padding=2)
-            self.conv1 = ConvBnRelu(in_channels=1,
-                                    out_channels=1,
-                                    kernel_size=7,
-                                    stride=1,
-                                    padding=3)
+            self.conv3 = ConvBnRelu(
+                in_channels=1,
+                out_channels=1,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+                norm_type=norm_type,
+                n_group=1,
+            )
+            self.conv2 = ConvBnRelu(
+                in_channels=1,
+                out_channels=1,
+                kernel_size=5,
+                stride=1,
+                padding=2,
+                norm_type=norm_type,
+                n_group=1,
+            )
+            self.conv1 = ConvBnRelu(
+                in_channels=1,
+                out_channels=1,
+                kernel_size=7,
+                stride=1,
+                padding=3,
+                norm_type=norm_type,
+                n_group=1,
+            )
 
         if global_pooling:
             self.branch1 = nn.Sequential(
                 nn.AdaptiveAvgPool2d(1),
-                ConvBnRelu(in_channels=in_channels,
-                           out_channels=out_channels,
-                           kernel_size=1,
-                           stride=1,
-                           padding=0))
+                ConvBnRelu(
+                    in_channels=in_channels,
+                    out_channels=out_channels,
+                    kernel_size=1,
+                    stride=1,
+                    padding=0,
+                    norm_type=norm_type,
+                    n_group=n_group,
+                ))
+
+        self.tmp = {}
 
     def forward(self, x):
         upscale_parameters = dict(mode=self.upscale_mode,
@@ -323,6 +407,7 @@ class PA(nn.Module):
             b = 0
 
         mid = self.mid(x)
+        self.tmp['mid'] = mid
 
         if self.use_pa:
             x1 = self.down1(x)
@@ -337,6 +422,7 @@ class PA(nn.Module):
             x = F.interpolate(self.conv1(x1) + x,
                               scale_factor=2,
                               **upscale_parameters)
+            self.tmp['attn'] = x.clone()
             x = torch.mul(x, mid)
         else:
             x = mid
@@ -358,6 +444,8 @@ class UP(nn.Module):
         global_pooling: bool,
         upscale_mode: str = 'bilinear',
         align_corners=True,
+        norm_type: str = 'batchnorm',
+        n_group: int = None,
     ):
         super(UP, self).__init__()
 
@@ -375,6 +463,8 @@ class UP(nn.Module):
                 padding=kernel_size // 2,
                 add_bn=up_relu,
                 add_relu=up_relu,
+                norm_type=norm_type,
+                n_group=n_group,
             )
         elif up_type == 'v2':
             # deeper with n_dec_ch
@@ -384,6 +474,8 @@ class UP(nn.Module):
                     out_channels=out_channels,
                     kernel_size=kernel_size,
                     padding=kernel_size // 2,
+                    norm_type=norm_type,
+                    n_group=n_group,
                 ),
                 ConvBnRelu(
                     in_channels=out_channels,
@@ -392,6 +484,8 @@ class UP(nn.Module):
                     padding=kernel_size // 2,
                     add_bn=up_relu,
                     add_relu=up_relu,
+                    norm_type=norm_type,
+                    n_group=n_group,
                 ),
             )
         elif up_type == 'v3':
@@ -402,6 +496,8 @@ class UP(nn.Module):
                     out_channels=in_channels,
                     kernel_size=kernel_size,
                     padding=kernel_size // 2,
+                    norm_type=norm_type,
+                    n_group=n_group,
                 ),
                 ConvBnRelu(
                     in_channels=in_channels,
@@ -410,6 +506,8 @@ class UP(nn.Module):
                     padding=kernel_size // 2,
                     add_bn=up_relu,
                     add_relu=up_relu,
+                    norm_type=norm_type,
+                    n_group=n_group,
                 ),
             )
         else:
@@ -423,10 +521,14 @@ class UP(nn.Module):
         if global_pooling:
             self.conv3 = nn.Sequential(
                 nn.AdaptiveAvgPool2d(1),
-                ConvBnRelu(in_channels=out_channels,
-                           out_channels=out_channels,
-                           kernel_size=1,
-                           add_relu=False), nn.Sigmoid())
+                ConvBnRelu(
+                    in_channels=out_channels,
+                    out_channels=out_channels,
+                    kernel_size=1,
+                    add_relu=False,
+                    norm_type=norm_type,
+                    n_group=n_group,
+                ), nn.Sigmoid())
 
     def forward(self, x, y):
         """
@@ -460,7 +562,9 @@ class ConvBnRelu(nn.Module):
                  add_bn: bool = True,
                  add_relu: bool = True,
                  bias: bool = True,
-                 interpolate: bool = False):
+                 interpolate: bool = False,
+                 norm_type: str = 'batchnorm',
+                 n_group: int = None):
         super(ConvBnRelu, self).__init__()
         self.conv = nn.Conv2d(in_channels=in_channels,
                               out_channels=out_channels,
@@ -474,7 +578,12 @@ class ConvBnRelu(nn.Module):
         self.add_bn = add_bn
         self.interpolate = interpolate
         if add_bn:
-            self.bn = nn.BatchNorm2d(out_channels)
+            if norm_type == 'batchnorm':
+                self.bn = nn.BatchNorm2d(out_channels)
+            elif norm_type == 'groupnorm':
+                self.bn = nn.GroupNorm(n_group, out_channels)
+            else:
+                raise NotImplementedError()
         if add_relu:
             self.activation = nn.ReLU(inplace=True)
 

@@ -1,5 +1,7 @@
-from trainer.start import *
 import segmentation_models_pytorch as smp
+from trainer.start import *
+
+from .common import *
 
 
 @dataclass
@@ -9,8 +11,6 @@ class UnetConfig(BaseConfig):
     n_in: int = 1
     n_dec_ch: Tuple[int] = (256, 128, 64, 32, 16)
     weights: str = 'imagenet'
-    pretrain_name: str = None
-    pretrain_prefix: str = None
 
     @property
     def name(self):
@@ -19,9 +19,10 @@ class UnetConfig(BaseConfig):
         name += f')'
         if self.weights is not None:
             name += f'-{self.weights}'
-        if self.pretrain_name is not None:
-            name += f'-w{self.pretrain_name}'
         return name
+
+    def make_model(self):
+        return Unet(self)
 
 
 class Unet(nn.Module):
@@ -36,11 +37,26 @@ class Unet(nn.Module):
         )
         self.pool = nn.AdaptiveMaxPool2d(1)
 
-    def forward(self, x):
-        seg = self.net(x).float()
-        x = self.pool(seg)
-        x = torch.flatten(x, 1)
-        return {
-            'pred': x,
-            'seg': seg,
-        }
+    def forward(self, img, classification=None, **kwargs):
+        # enforce float32 is a good idea
+        # because if the loss function involves a reduction operation
+        # it would be harmful, this prevents the problem
+        seg = self.net(img).float()
+        pred = self.pool(seg)
+        pred = torch.flatten(pred, start_dim=1)
+
+        loss = None
+        loss_pred = None
+        loss_bbox = None
+        if classification is not None:
+            loss_pred = F.binary_cross_entropy_with_logits(
+                pred, classification.float())
+            loss = loss_pred
+
+        return ModelReturn(
+            pred=pred,
+            pred_seg=seg,
+            loss=loss,
+            loss_pred=loss_pred,
+            loss_bbox=loss_bbox,
+        )
