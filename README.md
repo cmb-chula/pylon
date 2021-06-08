@@ -17,7 +17,7 @@ From the paper, "High resolution weakly supervised localization architectures fo
 
 ## What's included
 
-- Pytorch implementation of PYLON
+- Pytorch implementation of PYLON (see `pylon.py`)
     * [Pretrained weights](https://drive.google.com/file/d/1v26dU21hjePidW5crSXsrpf3OCJWLoWp/view?usp=sharing)
 - Additional results and heatmaps 
 - Code to reproduce the main results
