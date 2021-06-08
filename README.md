@@ -8,9 +8,11 @@ However, these heatmaps come in *low resolution* hindering explainaibilty of the
 From the paper, "High resolution weakly supervised localization architectures for medical images". [(Preprint)](https://arxiv.org/abs/2010.11475)
 
 **High resolution heatmaps:**
+
 ![high resolution heatmaps](figs/heading.png)
 
 **PYLON's architecture:**
+
 ![PYLON architecture](figs/figure_pylon_crop.png)
 
 ## What's included
