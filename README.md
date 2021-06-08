@@ -24,6 +24,7 @@ From the paper, "High resolution weakly supervised localization architectures fo
 
 ## Additional results
 
+### NIH's Chest X-Ray 14
 1. [Picked localization images (256 x 256)](figs/picked/bs64_nih14_256min0.7-rot90p0.5-bc(0.5,0.5)-cubic) (~20)
 
     * [PYLON](figs/picked/bs64_nih14_256min0.7-rot90p0.5-bc(0.5%2C0.5)-cubic/pylon-resnet50-uptype2layer-imagenet-dec128_lr0.0001term1e-06rop1fac0.2_fp16/0)
