@@ -209,7 +209,7 @@ class Experiment:
         dataset = self.data.picked
         conf_wo_augment = self.conf.data_conf.clone()
         conf_wo_augment.trans_conf = None
-        dataset_ref = conf_wo_augment.make_dateset().picked
+        dataset_ref = conf_wo_augment.make_dataset().picked
 
         target_dir = f'figs/picked/{self.conf.name}'
         if not os.path.exists(target_dir):
@@ -220,7 +220,7 @@ class Experiment:
         dataset = self.data.test
         conf_wo_augment = self.conf.data_conf.clone()
         conf_wo_augment.trans_conf = None
-        dataset_ref = conf_wo_augment.make_dateset().test
+        dataset_ref = conf_wo_augment.make_dataset().test
 
         target_dir = f'figs/all/{self.conf.name}'
         if not os.path.exists(target_dir):
