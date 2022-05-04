@@ -1,11 +1,26 @@
 # Official implementation of Pyramid Localization Network (PYLON)
 
+an iScience's paper [(read online)](https://www.sciencedirect.com/science/article/pii/S2589004222002036):
+
+```
+@article{PREECHAKUL2022103933,
+title = {Improved image classification explainability with high-accuracy heatmaps},
+journal = {iScience},
+volume = {25},
+number = {3},
+pages = {103933},
+year = {2022},
+issn = {2589-0042},
+doi = {https://doi.org/10.1016/j.isci.2022.103933},
+url = {https://www.sciencedirect.com/science/article/pii/S2589004222002036},
+author = {Konpat Preechakul and Sira Sriswasdi and Boonserm Kijsirikul and Ekapol Chuangsuwanich},
+keywords = {Artificial intelligence, Computer science, Signal processing}
+```
+
 CAM methods are used to produce *heatmaps* for explaining a deep classifier.
 However, these heatmaps come in *low resolution* hindering explainaibilty of the classifier. 
 
 **PYLON** *extends* the deep classifier allowing CAM methods to generate much *higher resolution* heatmaps resulting in much more *accurate explanation*. 
-
-From the paper, "High resolution weakly supervised localization architectures for medical images". [(Preprint)](https://arxiv.org/abs/2010.11475)
 
 **High resolution heatmaps:**
 
