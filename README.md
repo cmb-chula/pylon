@@ -33,7 +33,7 @@ However, these heatmaps come in *low resolution* hindering explainaibilty of the
 ## What's included
 
 - Pytorch implementation of PYLON (see `pylon.py`)
-    * [Pretrained weights](https://drive.google.com/file/d/1v26dU21hjePidW5crSXsrpf3OCJWLoWp/view?usp=sharing)
+    * [Pretrained weights](https://drive.google.com/file/d/19FWGkraATlcaJRmIryW8T6XQfmEqFIYf/view?usp=sharing)
 - Additional results and heatmaps 
 - Code to reproduce the main results
 
